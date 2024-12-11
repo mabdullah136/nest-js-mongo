@@ -1,57 +1,59 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Auth } from './schemas/auth.schema';
-import * as bcrypt from 'bcrypt';
-import { JwtService } from '@nestjs/jwt';
-import { Types } from 'mongoose';
+import { Injectable, BadRequestException } from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { Model } from "mongoose";
+import { Auth } from "./schemas/auth.schema";
+import * as bcrypt from "bcrypt";
+import { JwtService } from "@nestjs/jwt";
+import { Types } from "mongoose";
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectModel(Auth.name) private authModel: Model<Auth>,
-    private jwtService: JwtService,
+    private jwtService: JwtService
   ) {}
 
   async register(
     username: string,
     email: string,
-    password: string,
+    password: string
   ): Promise<Auth> {
     try {
       if (!password || password.trim().length === 0) {
-        throw new Error('Password cannot be empty');
+        throw new BadRequestException("Password cannot be empty");
       }
 
       if (!username || username.trim().length === 0) {
-        throw new Error('Username cannot be empty');
+        throw new BadRequestException("Username cannot be empty");
       }
 
       if (!email || email.trim().length === 0) {
-        throw new Error('Email cannot be empty');
+        throw new BadRequestException("Email cannot be empty");
       }
 
-      if (!email.includes('@')) {
-        throw new Error('Invalid email');
+      if (!email.includes("@")) {
+        throw new BadRequestException("Invalid email");
       }
 
       const existingUser = await this.authModel.findOne({ email });
       if (existingUser) {
-        throw new Error('Email is already taken');
+        throw new BadRequestException("Email is already taken");
       }
 
       if (password.length < 8) {
-        throw new Error('Password must be at least 8 characters long');
+        throw new BadRequestException(
+          "Password must be at least 8 characters long"
+        );
       }
 
       const salt = await bcrypt.genSalt();
       if (!salt) {
-        throw new Error('Failed to generate salt');
+        throw new BadRequestException("Failed to generate salt");
       }
 
       const hashedPassword = await bcrypt.hash(password, salt);
       if (!hashedPassword) {
-        throw new Error('Failed to hash password');
+        throw new BadRequestException("Failed to hash password");
       }
 
       const newUser = new this.authModel({
@@ -63,7 +65,6 @@ export class AuthService {
 
       return newUser.save();
     } catch (error) {
-      console.error('Error in register method:', error);
       throw error;
     }
   }
@@ -84,29 +85,29 @@ export class AuthService {
   }
 
   async findUser(): Promise<Auth[]> {
-    return this.authModel.find().select('-password -salt').exec();
+    return this.authModel.find().select("-password -salt").exec();
   }
 
   async findUserById(id: string): Promise<Auth | null> {
     if (!Types.ObjectId.isValid(id)) {
-      throw new Error('Invalid ID format');
+      throw new BadRequestException("Invalid ID format");
     }
-    return this.authModel.findById(id).select('-password -salt').exec();
+    return this.authModel.findById(id).select("-password -salt").exec();
   }
 
   async updateUser(
     id: string,
     username: string,
     oldPassword: string,
-    password: string,
+    password: string
   ): Promise<Auth> {
     if (!Types.ObjectId.isValid(id)) {
-      throw new Error('Invalid ID format');
+      throw new BadRequestException("Invalid ID format");
     }
 
     const user = await this.authModel.findById(id);
     if (!user) {
-      throw new Error('User not found');
+      throw new BadRequestException("User not found");
     }
 
     if (username) {
@@ -115,24 +116,26 @@ export class AuthService {
 
     if (password) {
       if (password.length < 8) {
-        throw new Error('Password must be at least 8 characters long');
+        throw new BadRequestException(
+          "Password must be at least 8 characters long"
+        );
       }
       if (!oldPassword) {
-        throw new Error('Old password is required');
+        throw new BadRequestException("Old password is required");
       }
       const validPassword = await this.validateOldPassword(id, oldPassword);
       if (!validPassword) {
-        throw new Error('Invalid old password');
+        throw new BadRequestException("Invalid old password");
       }
 
       const salt = await bcrypt.genSalt();
       if (!salt) {
-        throw new Error('Failed to generate salt');
+        throw new BadRequestException("Failed to generate salt");
       }
 
       const hashedPassword = await bcrypt.hash(password, salt);
       if (!hashedPassword) {
-        throw new Error('Failed to hash password');
+        throw new BadRequestException("Failed to hash password");
       }
       user.password = hashedPassword;
       user.salt = salt;
@@ -140,7 +143,7 @@ export class AuthService {
     user.save();
     const updatedUser = await this.authModel
       .findById(id)
-      .select('-password -salt')
+      .select("-password -salt")
       .exec();
     return updatedUser;
   }
